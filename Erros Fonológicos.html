@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Análise Fonológica</title>
+  <script src="https://unpkg.com/docx@8.0.0/build/index.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f8f9fa;
+      margin: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4a5568;
+      font-weight: 500;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #4299e1;
+    }
+
+    button {
+      background: #4299e1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #3182ce;
+    }
+
+    .palavra-container {
+      display: inline-flex;
+      align-items: center;
+      position: relative;
+      margin: 4px;
+    }
+
+    .palavra {
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: #f8fafc;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .palavra:hover {
+      background: #edf2f7;
+    }
+
+    .palavra.erro::after {
+      content: "";
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+
+    /* Cores consistentes para erros */
+    .substituicao { color: #c53030; }
+    .substituicao::after { background: #c53030; }
+    .omissao { color: #dd6b20; }
+    .omissao::after { background: #dd6b20; }
+    .insercao { color: #2b6cb0; }
+    .insercao::after { background: #2b6cb0; }
+    .transposicao { color: #2f855a; }
+    .transposicao::after { background: #2f855a; }
+
+    .opcoes-erro {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      display: none;
+      gap: 6px;
+      background: white;
+      padding: 8px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+
+    .opcoes-erro button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    /* Cores dos botões iguais aos erros */
+    .btn-substituicao { background: #fed7d7; color: #c53030; }
+    .btn-omissao { background: #feebc8; color: #dd6b20; }
+    .btn-insercao { background: #bee3f8; color: #2b6cb0; }
+    .btn-transposicao { background: #c6f6d5; color: #2f855a; }
+
+    .opcoes-erro button:hover {
+      filter: brightness(90%);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+      }
+      
+      .opcoes-erro {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Análise Fonológica</h1>
+    
+    <div class="input-group">
+      <label>Turma</label>
+      <input type="text" id="turma" required>
+    </div>
+
+    <div class="input-group">
+      <label>Aluno</label>
+      <input type="text" id="nome" required>
+    </div>
+
+    <div class="input-group">
+      <label>Data</label>
+      <input type="date" id="data" required>
+    </div>
+
+    <div class="input-group">
+      <label>Texto</label>
+      <textarea id="texto" rows="5" required></textarea>
+    </div>
+
+    <button onclick="processarTexto()">Analisar Texto</button>
+    <div id="palavras" style="margin-top: 20px;"></div>
+    <button id="exportar" onclick="exportarDocx()" style="display: none; margin-top: 20px;">Exportar Relatório</button>
+  </div>
+
+  <script>
+    function processarTexto() {
+      const texto = document.getElementById('texto').value;
+      const container = document.getElementById('palavras');
+      container.innerHTML = '';
+
+      texto.split(' ').forEach(palavra => {
+        const div = document.createElement('div');
+        div.className = 'palavra-container';
+        
+        const span = document.createElement('span');
+        span.className = 'palavra';
+        span.textContent = palavra;
+        span.onclick = (e) => mostrarOpcoes(e.target);
+        
+        const opcoes = document.createElement('div');
+        opcoes.className = 'opcoes-erro';
+        opcoes.innerHTML = `
+          <button class="btn-substituicao" onclick="registrarErro(this, 'substituicao')">Substituição</button>
+          <button class="btn-omissao" onclick="registrarErro(this, 'omissao')">Omissão</button>
+          <button class="btn-insercao" onclick="registrarErro(this, 'insercao')">Inserção</button>
+          <button class="btn-transposicao" onclick="registrarErro(this, 'transposicao')">Transposição</button>
+        `;
+
+        div.append(span, opcoes);
+        container.appendChild(div);
+      });
+
+      container.style.display = 'block';
+      document.getElementById('exportar').style.display = 'block';
+    }
+
+    function mostrarOpcoes(palavra) {
+      document.querySelectorAll('.opcoes-erro').forEach(o => o.style.display = 'none');
+      const menu = palavra.nextElementSibling;
+      menu.style.display = 'flex';
+    }
+
+    function registrarErro(botao, tipo) {
+      const palavra = botao.closest('.palavra-container').querySelector('.palavra');
+      palavra.classList.remove('erro', 'substituicao', 'omissao', 'insercao', 'transposicao');
+      palavra.classList.add('erro', tipo);
+      botao.closest('.opcoes-erro').style.display = 'none';
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.palavra-container')) {
+        document.querySelectorAll('.opcoes-erro').forEach(o => o.style.display = 'none');
+      }
+    });
+
+    async function exportarDocx() {
+      const erros = {
+        substituicao: [],
+        omissao: [],
+        insercao: [],
+        transposicao: []
+      };
+
+      document.querySelectorAll('.erro').forEach(palavra => {
+        const tipo = Array.from(palavra.classList).find(c => 
+          ['substituicao', 'omissao', 'insercao', 'transposicao'].includes(c)
+        );
+        if (tipo) erros[tipo].push(palavra.textContent);
+      });
+
+      const doc = new docx.Document({
+        sections: [{
+          children: [
+            new docx.Paragraph(`Turma: ${document.getElementById('turma').value}`),
+            new docx.Paragraph(`Aluno: ${document.getElementById('nome').value}`),
+            new docx.Paragraph(`Data: ${document.getElementById('data').value}`),
+            new docx.Paragraph("Análise de Erros:"),
+            new docx.Paragraph(""),
+            new docx.Paragraph({
+              text: "Substituições:",
+              heading: docx.HeadingLevel.HEADING_3
+            }),
+            ...erros.substituicao.map(p => new docx.Paragraph(`• ${p}`)),
+            new docx.Paragraph(""),
+            new docx.Paragraph({
+              text: "Omissões:",
+              heading: docx.HeadingLevel.HEADING_3
+            }),
+            ...erros.omissao.map(p => new docx.Paragraph(`• ${p}`)),
+            new docx.Paragraph(""),
+            new docx.Paragraph({
+              text: "Inserções:",
+              heading: docx.HeadingLevel.HEADING_3
+            }),
+            ...erros.insercao.map(p => new docx.Paragraph(`• ${p}`)),
+            new docx.Paragraph(""),
+            new docx.Paragraph({
+              text: "Transposições:",
+              heading: docx.HeadingLevel.HEADING_3
+            }),
+            ...erros.transposicao.map(p => new docx.Paragraph(`• ${p}`))
+          ]
+        }]
+      });
+
+      const blob = await docx.Packer.toBlob(doc);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'analise_fonologica.docx';
+      link.click();
+    }
+  </script>
+</body>
+</html>
